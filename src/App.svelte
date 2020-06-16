@@ -115,119 +115,82 @@
 		ctx.fill();
 	}
 
-
-	function findHorizontalStartIndex(x, y, turn) {
-		let i;
-		for(i = 1; i < 5; i++) {
-			if ((x - i) < 0) { break; }
-			if (board[x - i][y] !== turn) { break; }
-		}
-		return {
-			startXIndex: x - (i - 1),
-			startYIndex: y
-		}
-	}
-	function findVertialStartIndex(x, y, turn) {
-		let i;
-		for(i = 1; i < 5; i++) {
-			if ((y - i) < 0) { break; }
-			if (board[x][y - i] !== turn) { break; }
-		}
-		return {
-			startXIndex: x,
-			startYIndex: y - (i - 1)
-		}
-	}
-	function findStartDiagonalIndex(x, y, turn) {
-		let i;
-		for(i = 1; i < 5; i++) {
-			if ((y - i) < 0) { break; }
-			if ((x - i) < 0) { break; }
-			if (board[x - i][y - i] !== turn) { break; }
-		}
-		return {
-			startXIndex: x - (i - 1),
-			startYIndex: y - (i - 1)
-		};
-	}
-	function findStartSkewDiagonalIndex(x, y, turn) {
-		let i;
-		for(i = 1; i < 5; i++) {
-			if ((y + i) >= COLS_COUNT) { break; }
-			if ((x - i) < 0) { break; }
-			if (board[x - i][y + i] !== turn) { break; }
-		}
-		return {
-			startXIndex: x - (i - 1),
-			startYIndex: y + (i - 1)
-		};
-	}
-
-
-	function checkHorizontalConsecutive(x, y, turn) {
-		let { startXIndex } = findHorizontalStartIndex(x, y, turn);
-		let i;
-		for (i = 0; i < 5; i++) {
-			if((startXIndex + i) >= COLS_COUNT) { break; }
-			if (board[startXIndex + i][y] !== turn) { break; }
-		}
-		return (i === 5);
-	}
-
-	function checkVerticalConsecutive(x, y, turn) {
-		let { startYIndex } = findVertialStartIndex(x, y, turn);
-		let i;
-		for (i = 0; i < 5; i++) {
-			if((startYIndex + i) >= COLS_COUNT) { break; }
-			if (board[x][startYIndex + i] !== turn) { break; }
-		}
-		return (i === 5);
-	}
-
-	function checkDiagonalConsecutive(x, y, turn) {
-		let { startXIndex, startYIndex } = findStartDiagonalIndex(x, y, turn);
-		let i;
-		for (i = 0; i < 5; i++) {
-			if((startXIndex + i) >= COLS_COUNT) { break; }
-			if((startYIndex + i) >= COLS_COUNT) { break; }
-			if (board[startXIndex + i][startYIndex + i] !== turn) { break; }
-		}
-		return (i === 5);
-	}
-
-	function checkSkewDiagonalConsecutive(x, y, turn) {
-		let { startXIndex, startYIndex } = findStartSkewDiagonalIndex(x, y, turn);
-		let i;
-		for (i = 0; i < 5; i++) {
-			if((startXIndex + i) >= COLS_COUNT) { break; }
-			if((startYIndex - i) < 0) { break; }
-			if (board[startXIndex + i][startYIndex - i] !== turn) { break;}
-		}
-		return (i === 5);
-	}
-
 	function checkWinner(x, y, turn) {
-		// 1. - 축 확인
-		if (checkHorizontalConsecutive(x, y, turn)) {
-			return turn;
+		let horizontalInfo = {
+			x, y,
+			count: 0,
+			skipEven: false,
+			skipOdd: false,
+			block: []
+		};
+		let verticalInfo = {
+			x, y,
+			count: 0,
+			skipEven: false,
+			skipOdd: false,
+			block: []
+		};
+		let diagonalInfo = {
+			x, y,
+			count: 0,
+			skipEven: false,
+			skipOdd: false,
+			block: []
+		};
+		let skewDiagonalInfo = {
+			x, y,
+			count: 0,
+			skipEven: false,
+			skipOdd: false,
+			block: []
+		};
+
+		let sign = 1;
+		for (let i = 1; i <= 8; i++) {
+			const signI = i * sign;
+			pushInfo(horizontalInfo, signI, (info) => (info.x = info.x + signI));
+			pushInfo(verticalInfo, signI, (info) => (info.y = info.y + signI));
+			pushInfo(diagonalInfo, signI, (info) => (info.x = info.x + signI, info.y = info.y + signI));
+			pushInfo(skewDiagonalInfo, signI, (info) => (info.x = info.x + signI, info.y = info.y - signI));
+
+			sign *= -1;
 		}
 
-		// 2. | 축 확인
-		if (checkVerticalConsecutive(x, y, turn)) {
-			return turn;
+		for (let i = 0; i < 4; i++) {
+			accumulateCount(horizontalInfo, i);
+			accumulateCount(verticalInfo, i);
+			accumulateCount(diagonalInfo, i);
+			accumulateCount(skewDiagonalInfo, i);
 		}
 
-		// 3. \ 확인
-		if (checkDiagonalConsecutive(x, y, turn)) {
-			return turn;
-		}
-
-		// 4. / 확인
-		if (checkSkewDiagonalConsecutive(x, y, turn)) {
-			return turn;
-		}
-
+		if (horizontalInfo.count >= 4 || 
+			verticalInfo.count >= 4 ||
+			diagonalInfo.count >= 4 ||
+			skewDiagonalInfo.count >= 4) {
+				return turn;
+			}
 		return false;
+	}
+
+	function pushInfo(info, i, moveCallback) {
+		moveCallback(info);
+		if ((info.x < 0 || info.x > (COLS_COUNT - 1)) || (info.y < 0 || info.y > (COLS_COUNT - 1))) {
+			info.block.push(null);
+		} else {
+			info.block.push(board[info.x][info.y]);
+		}
+	}
+	function accumulateCount(info, i) {
+		if (!info.skipEven && info.block[i*2] === turn) {
+			info.count++;
+		} else {
+			info.skipEven = true;
+		}
+		if (!info.skipOdd && info.block[(i*2)+1] === turn) {
+			info.count++;
+		} else {
+			info.skipOdd = true;
+		}
 	}
 
 </script>
